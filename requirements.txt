@@ -3,3 +3,4 @@ matplotlib
 librosa
 moviepy
 jupyter
+progressbar
