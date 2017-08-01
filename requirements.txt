@@ -2,5 +2,6 @@ numpy
 matplotlib
 librosa
 moviepy
+argparse
 jupyter
 progressbar

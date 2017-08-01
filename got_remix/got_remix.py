@@ -4,6 +4,8 @@ import math
 import random
 import librosa
 import librosa.display
+import argparse
+import got_remix_utils
 import matplotlib.pyplot as plt
 from progressbar import ProgressBar
 from moviepy.editor import *
@@ -13,15 +15,13 @@ from moviepy.video.compositing.concatenate import concatenate
 FRAME_DURATION = 0.1
 THRESHOLD = 0.02
 FRAME_MIN_SIZE = 3
-DURATION = 60
+DURATION = 300
 
-INPUT_FILE_PATH = "resources/short_got.mp4"
-OUTPUT_FILE_PATH = "resources/got_remix.mp4"
 
 def split_audio_to_frames(file_path):
 
     # Load the audio from the video file
-    audio_data, sr = librosa.load(INPUT_FILE_PATH)
+    audio_data, sr = librosa.load(file_path)
 
     # Calculate the frame len based on the FRAME_DURATION constant and sample rate
     frame_len = FRAME_DURATION * sr
@@ -40,22 +40,28 @@ def split_audio_to_frames(file_path):
         if max_val < THRESHOLD:
             silent_frames.append(frame_num)
 
-    aggregated_frames = [silent_frames[0]]
+    # Aggregate consecutive frames and for each one save the local minimum in the frame
+    aggregated_frames = [(silent_frames[0], 0)]
     for index, frame_num in enumerate(silent_frames[1:]):
         if frame_num - silent_frames[index] > FRAME_MIN_SIZE:
-            aggregated_frames.append(frame_num)
+            start = int(frame_num * frame_len)
+            stop = int((frame_num * frame_len) + 0.3 * sr)
+            frame = map(abs, audio_data[start:stop])
+            min_val_index = frame.index(min(frame)) + (frame_num * frame_len)
+            aggregated_frames.append((frame_num, min_val_index))
 
     # Zip the frames together so we'll have a complete list of frames
     frames = zip(
-        [int(frame*frame_len) for frame in aggregated_frames], 
-        [int(frame*frame_len) - 1 for frame in aggregated_frames][1:]
+        [frame[1] for frame in aggregated_frames], 
+        [frame[1] - 1 for frame in aggregated_frames][1:]
     )
+    
     # Check if we calculated frames until the end of the file.
     # If not, add another frame until the end of the file.
     if frames[-1][1] < len(audio_data):
-       frames.append((frames[-1][1] + 1, len(audio_data))) 
+        frames[-1] = (frames[-1][0], len(audio_data))
 
-    # Return a list of found frames, 
+    # Return a list of found frames 
     # each list member is a tuple of (start_frame_index, end_frame_index)
     return frames, sr
 
@@ -79,6 +85,7 @@ def create_video_mix(input_file, output_file, frames, sr, max_duration=DURATION)
     start_clip = create_sub_clip(video_clip, frames[0], sr)
     end_clip = create_sub_clip(video_clip, frames[-1], sr)
     video_duration = start_clip.duration + end_clip.duration
+
     frames_in_new_video = []
 
     # This list will hold the sub clips for the final video
@@ -109,27 +116,29 @@ def create_video_mix(input_file, output_file, frames, sr, max_duration=DURATION)
     # Output video to file
     concat_clip.write_videofile(output_file)
 
-def plot_sound_wave(input_file, limits=[], v_lines_indexes = []):
-    # Load the audio from the video file
-    audio_data, sr = librosa.load(input_file)
-    plt.plot(audio_data)
-    # librosa.display.waveplot(audio_data)
-    for limit in limits:
-        plt.plot([limit] * len(audio_data))
-    if v_lines_indexes:
-        plt.vlines(v_lines_indexes, 0, audio_data.max(), color='k')
-    plt.show()
-
 def main():
 
-    # Split the audio of the video file to frames
-    frames, sr = split_audio_to_frames(INPUT_FILE_PATH)
+    # Get arguments
+    parser = argparse.ArgumentParser(description='Create a video mix of Sam working in the Citadel, Game of Thrones - Season 7 Episode 1)')
+    parser.add_argument('--input-file', help='The video input file', required=True)
+    parser.add_argument('--output-file', help='The video output file', required=True)
+    parser.add_argument('--output-duration', help='Duration, in seconds, of the final video', 
+        type=int, default=DURATION, required=False)
 
-    # Plot sound waves
-    # plot_sound_wave(INPUT_FILE_PATH, [THRESHOLD, -1*THRESHOLD], [x[0] for x in frames] + [frames[-1][1]])
+    args = parser.parse_args()
+
+    input_file = args.input_file
+    output_file = args.output_file
+    duration = args.output_duration
+
+    print("Creating video mix from {0} and outputing it to {1} with duration of {2}".format(
+        input_file, output_file, duration))
+
+    # Split the audio of the video file to frames
+    frames, sr = split_audio_to_frames(input_file)
 
     # Create the video mix from the frames
-    create_video_mix(INPUT_FILE_PATH, OUTPUT_FILE_PATH, frames, sr)
+    create_video_mix(input_file, output_file, frames, sr, duration)
 
 if __name__ == "__main__":
     sys.exit(main())
