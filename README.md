@@ -2,7 +2,7 @@
 
 Creating a remix of Sam from game of thrones cleaning the Citadel
 
-[Sam Citadel](https://www.youtube.com/watch?v=azU3I1rwNv8)
+![Sam Citadel](https://www.youtube.com/watch?v=azU3I1rwNv8)
 
 More details can be found here: http://kazuar.github.io/got-remix/
 
